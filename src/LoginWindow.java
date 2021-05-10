@@ -1,3 +1,5 @@
+import org.json.simple.parser.ParseException;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -5,14 +7,11 @@ import java.io.IOException;
 
 public class LoginWindow implements Runnable {
 
+    private boolean running = false;
     private JFrame window;
-    private JTextField emailField;
-    private JPasswordField passwordField;
-
-    private String userGUID;
 
     private void initialize() {
-        window = new JFrame("UserGUIDRequest");
+        window = new JFrame("Login");
         Container content = window.getContentPane();
         content.setLayout(new BoxLayout(content, BoxLayout.PAGE_AXIS));
         GridBagConstraints constraints = new GridBagConstraints();
@@ -33,11 +32,11 @@ public class LoginWindow implements Runnable {
 
         JPanel fieldsPanel = new JPanel(new GridBagLayout());
 
-        emailField = new JTextField(15);
+        JTextField emailField = new JTextField(15);
         emailField.setText("");
         JLabel emailLabel = new JLabel("Email: ");
         emailLabel.setFont(new Font("Times New Roman", Font.PLAIN, 14));
-        passwordField = new JPasswordField(15);
+        JPasswordField passwordField = new JPasswordField(15);
         passwordField.setText("");
         JLabel passwordLabel = new JLabel("Password: ");
         passwordLabel.setFont(new Font("Times New Roman", Font.PLAIN, 14));
@@ -65,18 +64,24 @@ public class LoginWindow implements Runnable {
                 String password = new String(passwordField.getPassword());
 
                 if (email.equals("")) {
-                    JOptionPane.showMessageDialog(window, "Please enter an email address", "Invalid email", 0);
+                    JLabel label = new JLabel("Please enter an email address");
+                    label.setFont(new Font("Times New Roman", Font.PLAIN, 16));
+                    JOptionPane.showMessageDialog(window, label, "Invalid Email", 0);
                 } else if (password.equals("")) {
-                    JOptionPane.showMessageDialog(window, "Please enter a password", "Invalid password", 0);
+                    JLabel label = new JLabel("Please enter a password");
+                    label.setFont(new Font("Times New Roman", Font.PLAIN, 16));
+                    JOptionPane.showMessageDialog(window, label, "Invalid Password", 0);
                 } else {
-                    /*try {
-                        userGUID = Requests.getUserGUID(email, password);
+                    try {
+                        Requests.getGUID(email, password);
                     } catch (IOException exception) {
-                        userGUID = null;
                         exception.printStackTrace();
-                    }*/
+                    } catch (ParseException exception) {
+                        exception.printStackTrace();
+                    }
 
-                    if (userGUID != null) {
+                    if (Requests.isValidGUID()) {
+                        running = false;
                         window.dispose();
 
                         //Requests.getLocationGUID();
@@ -91,7 +96,14 @@ public class LoginWindow implements Runnable {
             }
         });
         JButton cancelButton = new JButton("Cancel");
-        cancelButton.addActionListener(e -> window.dispose());
+        cancelButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                running = false;
+                window.dispose();
+                System.exit(0);
+            }
+        });
         cancelButton.setFont(new Font("Times New Roman", Font.PLAIN, 14));
 
         constraints.gridx = 0;
@@ -106,11 +118,25 @@ public class LoginWindow implements Runnable {
         content.add(fieldsPanel, constraints);
 
         content.add(buttonPanel, constraints);
+
+        window.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing (WindowEvent windowEvent) {
+                running = false;
+                System.exit(0);
+            }
+        });
+
         window.setVisible(true);
+    }
+
+    protected boolean isRunning() {
+        return running;
     }
 
     @Override
     public void run() {
+        running = true;
         initialize();
     }
 }
