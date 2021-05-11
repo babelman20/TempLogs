@@ -4,13 +4,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.text.SimpleDateFormat;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 
 import org.json.simple.*;
 import org.json.simple.parser.JSONParser;
@@ -70,31 +66,46 @@ public abstract class Requests {
     }
 
     protected static void getTempsTimes(String device, Date startDate, Date endDate) throws IOException, ParseException {
-        HashMap<String, Double> tempstimes = new HashMap<>();
-        SimpleDateFormat fmt = new SimpleDateFormat("MM/dd/yyy");
-        String start = fmt.format(startDate), end = fmt.format(endDate);
+        HashMap<Date, Double> tempstimes = new HashMap<>();
+        SimpleDateFormat fmt = new SimpleDateFormat("MM/dd/yyy%20KK:mm:ss");
+
+        LocalDateTime start = LocalDateTime.ofInstant(startDate.toInstant(), ZoneOffset.systemDefault());
+        start = start.minusHours(start.getHour()).minusMinutes(start.getMinute()).minusSeconds(start.getSecond()).minusNanos(start.getNano());
+        start = LocalDateTime.ofInstant(start.toInstant(ZoneOffset.systemDefault().getRules().getStandardOffset(startDate.toInstant())), ZoneOffset.UTC);
+        LocalDateTime end = LocalDateTime.ofInstant(endDate.toInstant(), ZoneOffset.systemDefault());
+        end = end.plusHours(23-end.getHour()).plusMinutes(59-end.getMinute()).plusSeconds(59-end.getSecond()).minusNanos(end.getNano());
+        end = LocalDateTime.ofInstant(end.toInstant(ZoneOffset.systemDefault().getRules().getStandardOffset(endDate.toInstant())), ZoneOffset.UTC);
+
+        if (ZoneOffset.systemDefault().getRules().isDaylightSavings(startDate.toInstant())) {
+            start = start.minusHours(1);
+        }
+        if (ZoneOffset.systemDefault().getRules().isDaylightSavings(endDate.toInstant())) {
+            end = end.minusHours(1);
+        }
+
+        end = end.minusDays(1);
+
+        String startStr = start.format(DateTimeFormatter.ofPattern("MM/dd/yyyy%20HH:mm:ss"));
+        String endStr = end.format(DateTimeFormatter.ofPattern("MM/dd/yyyy%20HH:mm:ss"));
         String deviceID = devices.get(device);
         String query = baseURL + "/Devices.svc/Readings?";
         query += "APIToken=" + apiToken;
         query += "&userGUID=" + GUID;
         query += "&sensorGUID=" + deviceID;
-        query += "&startDate=" + start + "%2000:00:00";
-        query += "&endDate=" + end + "%2023:59:59";
-        query += "&localTime=true&descendingDateOrder=false&samplesOnly=false";
+        query += "&startDate=" + startStr;
+        query += "&endDate=" + endStr;
+        query += "&localTime=false&descendingDateOrder=true&samplesOnly=false";
         InputStream stream = getData(query);
         if (stream != null) {
             JSONArray response = (JSONArray) new JSONParser().parse(new InputStreamReader(stream, "UTF-8"));
             for (int i = 0; i < response.size(); i++) {
                 System.out.printf("%d", i);
                 JSONObject obj = (JSONObject) response.get(i);
-                String d = ((String) obj.get("datetime"));
-                Calendar c2 = Calendar.getInstance();
-                c2.setTimeInMillis(Long.parseLong(d.substring(6, d.length() - 7)));
-                Date now = c2.getTime();
-                //JSONArray hold = (JSONArray) obj.get("channels");
+                String d = (String) obj.get("datetime");
+                Calendar c = Calendar.getInstance();
+                c.setTimeInMillis(Long.parseLong(d.substring(6, d.length() - 7)));
                 double temp = Double.parseDouble(((JSONArray) obj.get("channels")).get(0).toString());
-                temp = temp * (double)9/5 + 32;
-                tempstimes.put(d, temp);
+                tempstimes.put(c.getTime(), temp * (double)9/5 + 32);
             }
         }
 
