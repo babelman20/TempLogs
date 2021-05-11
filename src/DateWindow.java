@@ -1,18 +1,30 @@
+
+
+import net.sourceforge.jdatepicker.impl.JDatePanelImpl;
+import net.sourceforge.jdatepicker.impl.JDatePickerImpl;
+import net.sourceforge.jdatepicker.impl.UtilDateModel;
 import org.json.simple.parser.ParseException;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Properties;
 
-public class LoginWindow implements Runnable {
+import static java.util.Calendar.DATE;
+
+public class DateWindow implements Runnable {
 
     private boolean running = false;
-    private static DateWindow date = new DateWindow();
     private JFrame window;
 
     private void initialize() {
-        window = new JFrame("Login");
+        window = new JFrame("Select Thermometer and Date Range");
         Container content = window.getContentPane();
         content.setLayout(new BoxLayout(content, BoxLayout.PAGE_AXIS));
         GridBagConstraints constraints = new GridBagConstraints();
@@ -22,9 +34,8 @@ public class LoginWindow implements Runnable {
         window.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
         JPanel titlePanel = new JPanel(new GridBagLayout());
-        JLabel title = new JLabel("Enter EasyLogCloud email and password");
+        JLabel title = new JLabel("Select a start/end date and a thermometer");
         title.setFont(new Font("Times New Roman", Font.PLAIN, 18));
-
         constraints.gridx = 0;
         constraints.gridy = 0;
         constraints.gridwidth = 1;
@@ -33,63 +44,57 @@ public class LoginWindow implements Runnable {
 
         JPanel fieldsPanel = new JPanel(new GridBagLayout());
 
-        JTextField emailField = new JTextField(15);
-        emailField.setText("");
-        JLabel emailLabel = new JLabel("Email: ");
-        emailLabel.setFont(new Font("Times New Roman", Font.PLAIN, 14));
-        JPasswordField passwordField = new JPasswordField(15);
-        passwordField.setText("");
-        JLabel passwordLabel = new JLabel("Password: ");
-        passwordLabel.setFont(new Font("Times New Roman", Font.PLAIN, 14));
+        JDatePickerImpl startPicker = new JDatePickerImpl(new JDatePanelImpl(new UtilDateModel()));
+        JLabel startLabel = new JLabel("Start Date: ");
+        startLabel.setFont(new Font("Times New Roman", Font.PLAIN, 14));
+        JDatePickerImpl endPicker = new JDatePickerImpl(new JDatePanelImpl(new UtilDateModel()));
+        JLabel endLabel = new JLabel("End Date: ");
+        endLabel.setFont(new Font("Times New Roman", Font.PLAIN, 14));
+        JComboBox devicePicker = new JComboBox(Requests.getDeviceNames());
+        JLabel deviceLabel = new JLabel("Device :");
+        deviceLabel.setFont(new Font("Times New Roman", Font.PLAIN, 14));
 
         constraints.gridx = 0;
         constraints.gridy = 0;
-        fieldsPanel.add(emailLabel, constraints);
+        fieldsPanel.add(startLabel, constraints);
 
         constraints.gridx = 1;
-        fieldsPanel.add(emailField, constraints);
+        fieldsPanel.add(startPicker, constraints);
 
         constraints.gridx = 0;
         constraints.gridy = 1;
-        fieldsPanel.add(passwordLabel, constraints);
+        fieldsPanel.add(endLabel, constraints);
 
         constraints.gridx = 1;
-        fieldsPanel.add(passwordField, constraints);
+        fieldsPanel.add(endPicker, constraints);
+
+        constraints.gridx = 0;
+        constraints.gridy = 2;
+        fieldsPanel.add(deviceLabel, constraints);
+
+        constraints.gridx = 1;
+        fieldsPanel.add(devicePicker, constraints);
+
 
         JPanel buttonPanel = new JPanel(new GridBagLayout());
-        JButton okButton = new JButton("Ok");
+        JButton okButton = new JButton("Confirm");
         okButton.setFont(new Font("Times New Roman", Font.PLAIN, 14));
         okButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                String email = emailField.getText();
-                String password = new String(passwordField.getPassword());
+                Date start = (Date)startPicker.getModel().getValue();
+                Date end = (Date)endPicker.getModel().getValue();
+                String device = devicePicker.getSelectedItem().toString();
 
-                if (email.equals("")) {
-                    JLabel label = new JLabel("Please enter an email address");
+                System.out.println(device);
+                if (start.compareTo(end) >= 0) {
+                    JLabel label = new JLabel("End date must come after start date");
                     label.setFont(new Font("Times New Roman", Font.PLAIN, 16));
-                    JOptionPane.showMessageDialog(window, label, "Invalid Email", 0);
-                } else if (password.equals("")) {
-                    JLabel label = new JLabel("Please enter a password");
-                    label.setFont(new Font("Times New Roman", Font.PLAIN, 16));
-                    JOptionPane.showMessageDialog(window, label, "Invalid Password", 0);
+                    JOptionPane.showMessageDialog(window, label, "Invalid dates", 0);
                 } else {
                     try {
-                        Requests.getGUID(email, password);
-
-                        if (Requests.isValidGUID()) {
-                            running = false;
-                            window.dispose();
-
-                            //Requests.getLocationGUID();
-
-                            Requests.getDeviceInfo();
-
-                            SwingUtilities.invokeLater(date);
-                        } else {
-                            JOptionPane.showMessageDialog(window, "The userGUID was not found", "userGUID not found", 0);
-                        }
+                        Requests.getTempsTimes(device, start, end);
                     } catch (IOException exception) {
-                            exception.printStackTrace();
+                        exception.printStackTrace();
                     } catch (ParseException exception) {
                         exception.printStackTrace();
                     }
@@ -125,6 +130,7 @@ public class LoginWindow implements Runnable {
             @Override
             public void windowClosing (WindowEvent windowEvent) {
                 running = false;
+                Main.run = false;
                 System.exit(0);
             }
         });
@@ -134,10 +140,6 @@ public class LoginWindow implements Runnable {
 
     protected boolean isRunning() {
         return running;
-    }
-
-    protected boolean isDateRunning() {
-        return date.isRunning();
     }
 
     @Override
